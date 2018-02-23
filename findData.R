@@ -1,35 +1,140 @@
 #!/usr/bin/env Rscript
 library(dplyr)
+library(stringr)
+library(lubridate)
+source("funcs.R")
+getmonths <- function(dob, vdate)  ymd(dob) %--% ymd(vdate) %/% months(1) %>% as.numeric
 
-cogrest <- "/Volumes/Phillips/CogRest/"
-cog_dm  <- "/Volumes/Phillips/COG/"
-bea_res <- "/Volumes/L/bea_res/Data/Tasks"
-
-subj <-
- Sys.glob(paste0(cogrest, "subjs/1*_2*/")) %>%
- gsub(".*/([0-9]{5}_[0-9]{8})/.*", "\\1", .)
-
-eydfiles <- function(s, task){
-  gsub("_", "/", s) %>%
-    sprintf("%s/%s/Basic/%s/Raw/EyeData/*eyd", bea_res, task, .) %>%
-    Sys.glob %>% grep("abort", ., invert=T,value=T)
+# https://ndar.nih.gov/ndarpublicweb/Documents/Tutorials/tutorial_validation-tool.mp4
+write.upload <- function(d, uptype, upver, outfile) {
+ header <- sprintf('"%s","%s"\n', uptype, upver)
+ sink(outfile)
+ cat(header)
+ write.csv(d, row.names=F)
+ sink()
 }
 
-mrfiles <- function(s, task,file="functional.nii.gz"){
-  gsub("_", "/", s) %>%
-    sprintf("%s/%s/%s/%s", cog_dm, ., task,file) %>%
-    Sys.glob
+get_as_nii <- function(lunadate, run, task="AS") {
+   nii<-NULL
+   if (task=="AS") {
+    nii <- sprintf("/Volumes/Phillips/CogRest/subjs/%s/funcs/%s/*.nii.gz", lunadate, run) %>%
+       Sys.glob %>%
+       head(n=1) %>%
+       unlist
+   }
+   return(nii)
 }
 
-mrfiles_fc <- function(s,nii="funcs/[0-9]/9VGSANTI_*.nii.gz") {
-    sprintf("%s/subjs/%s/%s", cogrest, s, nii) %>%
-    Sys.glob
+# odd interleaved slice tiems, ucMode=0x4
+gen_slice_time <- function(nslc=29, tr=2){
+  nslc <- 29
+  stim <- seq(0, tr - 1/nslc, length.out=nslc)
+  sidx <- c(seq(1, nslc, 2), seq(2, nslc, 2))
+  slicetimes <- stim[sidx]
+  return(paste0("[", paste(slicetimes, collapse=", "), "]"))
 }
-list_csv <- function(l) {
- unname(unlist(lapply(l, paste, sep=",", collapse=",")))
+
+#  01_goodsubjs.R ouptut to upload dataframe
+#  expect lunadate,GUID,interview_date,dob,image_description
+#  will generate interview_age and add missing columns
+subjs_to_img <- function(d, expid, scan_type="fMRI", dcminfo=NULL) {
+   out <-
+    d %>%
+    mutate(subjectkey=GUID,
+           src_subject_id=lunadate,
+           gender=sex,
+           vdate=gsub(".*_", "", lunadate),
+           interview_date= vdate %>%
+                          ymd %>% format(format="%m/%d/%Y"),
+           interview_age=getmonths(dob, vdate),
+           image_file=nii, #paste(sep="/", dir, "*"),
+           experiment_id=expid,
+           scan_type=scan_type,
+           scan_object="Live",
+           image_file_format="NIFTI", #"DICOM",
+           image_modality="MRI",
+           transformation_performed="No") %>%
+    select(subjectkey, src_subject_id, gender, interview_date, interview_age,
+          image_file, image_description, experiment_id, scan_type, scan_object,
+          image_file_format, image_modality, transformation_performed)
+
+    return(out)
 }
 
 
+
+
+# created by 01_goodsubjs.R
+# has all IDS -  one row per dicom directory
+subjs <- read.table("txt/goodsubjs.csv", sep=",", header=T)
+
+antistate_eye_list <-
+    subjs[subjs$has.AS, "lunadate"] %>%
+    unique %>%
+    lapply(function(x) {
+      eyd <- eydfiles(x, "AntiState")
+      if (length(eyd)>0L){
+         return(data.frame(lunadate=x, eyd=eyd))
+      } else {
+         return(NULL)
+      }
+    })
+
+antistate_eye <-
+   antistate_eye_list %>%
+   bind_rows %>%
+   group_by(lunadate) %>%
+   mutate( runno = str_extract(eyd, regex("(?<=run)\\d", ignore_case=T)) %>%
+                                  as.numeric,
+           ver = str_extract(eyd, regex("(?<=_)[0-2]?[0-9][AVav][AVav]")) %>%
+                 toupper,
+           neyd = n())
+
+antistate_eye %>% filter(is.na(ver)|neyd!=4|is.na(runno)) %>% print.data.frame
+# 10361/20061111 has 6!
+# 0136/20090716 - no 4, 10152/20080806 - no 2; 10173_20140524 - no 1
+
+# merge good subjects with good antistate by run and id
+subjs_as <-
+ antistate_eye %>%
+ filter(neyd <= 4) %>%
+ merge(subjs %>% filter(grepl("Anti", Name, ignore.case=T)),
+       by=c("lunadate", "runno")) %>%
+ mutate( image_description=sprintf("run%d;%s", runno, ver))
+
+subjs_as_nii <-
+   subjs_as %>%
+   mutate(nii = get_as_nii(lunadate, runno) )
+# nothing missing
+subjs_as_nii %>% filter(!grepl('.nii.gz$',nii)) %>% nrow
+
+
+# software changes, but nothing else
+# so get software (and matrix) for all
+software <-
+   lapply(subjs_as_nii$dir,img_info_dcmslow) %>%
+   lapply(as.data.frame) %>% bind_rows
+
+# and cbind it with the other constants
+imgout_as <- subjs_to_img(subjs_as_nii, 831) %>%
+   cbind(software) %>%
+   cbind(img_info_nii(subjs_as_nii$nii[1])) %>%
+   cbind(img_info_hard()) %>%
+   cbind(img_info_dcm(subjs_as_nii$dir[nrow(subjs_as_nii)]))
+
+# write out
+write.upload(imgout_as, "image", "03", outfile="AS_upload.csv")
+
+## again for mgs
+
+
+
+
+
+
+##### OLD
+eyefiles <- sapply(subjs$lunadate, eydfiles, "AntiState")
+# -- build list
 d_f <- data.frame(
   lunadate  = subj,
   ey.anti   = lapply(subj, eydfiles, "AntiState") %>% list_csv,
@@ -41,36 +146,57 @@ d_f <- data.frame(
   t1.fc     = lapply(subj, mrfiles_fc, "t1_*/mprage.nii.gz") %>% list_csv
 )
 
-d_f_cnt <-
- d_f %>%
- mutate_at(vars(-lunadate),
-           funs(as.character(.) %>%
-                strsplit(split=',') %>%
-                lapply(length) %>%
-                unlist))
+
+d_f_cnt <- cntcommas(d_f)
+
+mgs.missing <- d_f_cnt %>%
+   filter( t1 + t1.fc != 0, mr.mgs == 0, ey.mgs != 0 ) %>%
+   tidyr::separate(lunadate, c("luna", "date")) %>%
+   mutate(bircdatepart=substr(date, 3, 8)) %>%
+   select(luna, date, bircdatepart)
+
+
+## find all dcms
+mrinfo %>%
+  filter(study %in% c("coglongbirc", "coglong"),
+         ( (Name == "ep2d_bold_MGS" & ndcm == 229) |
+           (grepl("AntiVGS|VGSAnti", Name, ignore.case=T)) &
+            ndcm %in% c(244, 245))) %>%
+  mutate(bircdatepart=substr(id, 0, 6)) %>%
+  merge(mgs.missing, by="bircdatepart") %>%
+  select(luna, date, id, dir) %>%
+  tidyr::unite("lunadate", luna, date) %>%
+  group_by(id) %>%
+  arrange(dir)
 
 
 
-# ditch those who have no task data
-nmgs <- unlist(lapply(mgs, length))
-nanti <- unlist(lapply(antistate, length))
-keep <- nmgs > 1 & nanti > 1 & (nmgs + nanti > 2)
-# 149 people are ditched
-subj <- subj[keep]
-anti <- antistate[keep]
-mgs <- mgs[keep]
 
+## try to find mgs dicoms
 
-## try from dicom
-# library(dbplyr)
-# mrcon <- DBI::dbConnect(RSQLite::SQLite(), "/Volumes/Zeus/mr_sqlite/db")
-# mrinfo <- data.frame(tbl(mrcon, "mrinfo"))
-# d <-
-#    mrinfo %>%
-#    filter(grepl("cog", study),
-#           grepl("bold|t1_mprage", Name) ) %>%
-#    #filter(ndcm %in% c(229, 244) ) %>%
-#    filter(ndcm > 150 ) %>%
-#    select(study, seqno, ndcm, Name, Date, dir)
-# 
-# d %>% group_by(Date) %>% summarise(n=paste(collapse=',',unique(sort(ndcm)))) %>% group_by(n) %>% summarise(dr=paste(collapse=",",range(Date)),cnt=n()) %>% arrange(cnt) %>% print.data.frame
+mgs.found <-
+  mrinfo %>%
+  filter(study %in% c("coglongbirc", "coglong"),
+         Name == "ep2d_bold_MGS",
+         ndcm == 229) %>%
+  mutate(bircdatepart=substr(id, 0, 6)) %>%
+  merge(mgs.missing, by="bircdatepart") %>%
+  select(luna, date, id, dir) %>%
+  tidyr::unite("lunadate", luna, date) %>%
+  group_by(id) %>%
+  arrange(dir)
+
+# make sure only one birc partial per lunaid
+badidmatch <-
+   mgs.found %>% ungroup %>%
+   group_by(lunadate) %>%
+   summarise(n=length(unique(id))) %>% filter(n!=1)
+if (length(badidmatch) != 0L) stop(badidmatch)
+
+# add new dcms, and recalc d_f_cnt
+mgs.dcm <-
+   mgs.found %>%
+   group_by(lunadate) %>%
+   summarise(mgs.dcm=paste(collapse=",", unique(dir)) )
+d_f_dcm <- merge(d_f, mgs.dcm, by="lunadate", all=T)
+d_f_cnt <- cntcommas(d_f_dcm)
