@@ -38,3 +38,17 @@ cntcommas <- function(d_f) {
                   lapply(length) %>%
                   unlist))
 }
+
+# given dataframe with lunadate and runno
+make_missing_nii <- function(d, task) {
+   cmds <- d %>%
+      filter(is.na(nii)) %>%
+      mutate(outdir=sprintf("/Volumes/Hera/Raw/NDAR_Cog/%s/%s/%s",
+                            task, lunadate, runno),
+             cmd=sprintf("dcm2niix -o %s -f %02d_%%p %s", outdir, runno, dir)
+      ) %>%
+      select(outdir, cmd)
+
+   lapply(cmds$outdir, dir.create, recursive=T)
+   lapply(cmds$cmd, system)
+}

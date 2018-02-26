@@ -26,7 +26,7 @@ img_info_dcm <- function(dcmdir, dcmpatt="/*.dcm") {
    )
    fullcmd <- paste(sep=" ", cmd, paste(tags, collapse=" "), dcm)
    out <- system(fullcmd, intern=T)
-   outv <- as.list(strsplit(out," ")[[1]])
+   outv <- as.list(strsplit(out, " ")[[1]])
    nidx <- c(3:7, 10)
    outv[nidx] <- as.numeric(outv[nidx])
    names(outv) <- names(tags)
@@ -43,8 +43,13 @@ img_info_dcmslow <- function(dcmdir, dcmpatt="/*.dcm") {
     grep("Matrix|Software", ., value=T) %>%
     strsplit("//") %>%
     lapply("[", 3) %>%
-    lapply(gsub, pattern="^ | $", replace="") %>%
-    `names<-`(c("scanner_software_versions_pd", "acquisition_matrix"))
+    lapply(gsub, pattern="^ | $", replace="")
+
+   if (length(res) != 2) res <- list(NA, NA)
+
+   names(res) <- c("scanner_software_versions_pd",
+                   "acquisition_matrix")
+   return(res)
 }
 
 
