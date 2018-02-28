@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
-
+library(LNCDR)
+library(dplyr)
 #
 # create goodsubjs.csv
 # - IDs: bircid, lunaid, lunadate, GUID
@@ -61,4 +62,5 @@ goodsubj <-
 subjs <- goodsubj %>% filter(has.t1)
 # drop 10 without t1s
 
+# writeout
 write.table(subjs, "txt/goodsubjs.csv", row.names=F, quote=T, sep=",")
