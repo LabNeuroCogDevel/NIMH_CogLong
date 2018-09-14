@@ -1,4 +1,4 @@
-txt/guid_luna.csv:
+txt/guid_luna.csv: txt/PseudoGUID_Foran_260.csv
 	Rscript ./00_GUID_Luna.R
 
 txt/goodsubjs.csv: txt/guid_luna.csv
