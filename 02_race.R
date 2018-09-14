@@ -2,8 +2,18 @@ library(dplyr)
 source('findData.R')
 subjs <- read.csv("txt/goodsubjs.csv")
 
+# 20180709 -- this has all 167 subjects
+
+# visitsmry <- visits %>% group_by(subjectkey) %>% summarise(n=n(),race=paste(unique(race)))
+#       98      ASIAN      BLACK OTHER RACE      WHITE 
+#       46          4         12          5        100 
+# summary(as.factor(visitsmry$race))
+#        98      ASIAN      BLACK OTHER RACE      WHITE 
+#        78         20         51         24        462 
+
+
 # get ethnicity
-sub_info <- LNCDR::db_query(conn=conn, "
+sub_info <- LNCDR::db_query("
 with spit as (
   select pid, vtimestamp, task from visit_task
   natural join visit
@@ -74,9 +84,15 @@ visits <-
  mutate(phenotype="Control",
         phenotype_description="no phenotype distinctions; normative sample",
         sibling_study = "No",
+        twins_study = "No",
+        sample_taken="No",
         family_study = "No",
 )
-
-
 write.upload(visits, "ndar_subject", 1, "txt/upload/race_upload.csv")
 
+## find whats missing
+just_subjs <- subjs %>% group_by(lunaid,GUID,lunadate,bircid) %>% tally
+visitsmry <- visits %>% group_by(subjectkey) %>% summarise(n=n(),race=paste(unique(race))) 
+summary(as.factor(visitsmry$race))
+
+system('scp txt/upload/race_upload.csv skynet:~/Downloads/upload/')

@@ -16,6 +16,9 @@ getmonths <- function(dob, vdate) {
 
 write.upload <- function(d, uptype, upver, outfile) {
  header <- sprintf('"%s","%s"\n', uptype, upver)
+
+ # remove date part of lunaid - 20180709
+ if("src_subject_id" %in% names(d) ) d$src_subject_id <- gsub("_.*","",d$src_subject_id)
  sink(outfile)
  cat(header)
  write.csv(d, row.names=F)
