@@ -1,3 +1,12 @@
+#
+# get nifti and dicom info
+#  1) hard code acquisition, orientation, dims, and timing
+#  2) lookup image params through dicom tags (dicom_hinfo)
+#  3) get sotware and matrix (dicom_hdr N.B. newer [20180404/18.1] afni has dicom_hinfo -full_entry, could use that instead)
+#  4) nifti info  (3dinfo)
+# use template csv to null out missing fields
+#
+
 # hard coded values (slice timing and orientation)
 img_info_hard <- function() {
    outv <- list(

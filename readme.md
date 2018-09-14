@@ -2,11 +2,13 @@
 Longitudinal Profiles of Neurocognitive Development Through Adolescence 
 
 collection: https://ndar.nih.gov/edit_collection.html?id=2831
-
 ## Upload
+### Generate NDAR upload csv
+see [`Makefile`](./Makefile)
+
 ### data templates
-  * MR (fmri, mprage) - [image03](https://ndar.nih.gov/data_structure.html?short_name=image03)
-  * Eyetracking - [et_subject_experiment01](https://ndar.nih.gov/data_structure.html?short_name=et_subject_experiment01)
+  * MR (fmri, mprage) - [`image03`](https://ndar.nih.gov/data_structure.html?short_name=image03)
+  * Eyetracking - [`et_subject_experiment01`](https://ndar.nih.gov/data_structure.html?short_name=et_subject_experiment01)
 
 ### tasks
 

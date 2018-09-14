@@ -1,4 +1,10 @@
-#!/usr/bin/env Rscript
+# functions to output in NDAR formats. used by 02* functions
+#   02_MGS.R
+#   02_AS.R
+#   02_t1.R
+#   02_race.R
+#
+
 library(dplyr)
 library(stringr)
 library(lubridate)
@@ -14,6 +20,9 @@ getmonths <- function(dob, vdate) {
    ymd(dob) %--% ymd(vdate) %/% months(1) %>% as.numeric
 }
 
+# prepare dataframe as upload csv
+# 1) add "type, ver" as first line of output
+# 2) src_subject_id cannot have longitudinal info: remove _yyyymmdd
 write.upload <- function(d, uptype, upver, outfile) {
  header <- sprintf('"%s","%s"\n', uptype, upver)
 
@@ -25,6 +34,9 @@ write.upload <- function(d, uptype, upver, outfile) {
  sink()
 }
 
+# find where the nifti image lives for AS, MS, and T1
+#  Dani, David, and Finn processed different subsets.
+#  Raw/NDAR_Cog has those missed by all
 get_nii <- function(lunadate, run, task="AS") {
    lunadate <- as.character(lunadate)
    if (task=="AS") {
