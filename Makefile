@@ -18,3 +18,6 @@ txt/upload/T1_fmri_upload.csv: txt/goodsubjs.csv
 
 txt/upload_no-src-date_visit2+/AS_eye_upload.csv txt/upload_no-src-date_visit2+/AS_fmri_upload.csv txt/upload_no-src-date_visit2+/MS_eye_upload.csv txt/upload_no-src-date_visit2+/MS_fmri_upload.csv txt/upload_no-src-date_visit2+/T1_fmri_upload.csv:  txt/upload/MS_eye_upload.csv txt/upload/MS_fmri_upload.csv txt/upload/AS_eye_upload.csv txt/upload/AS_fmri_upload.csv txt/upload/T1_fmri_upload.csv
 	Rscript ./04_redo_submit_no_repeat.R
+
+txt/share/wasi_coglong.csv: txt/upload/T1_fmri_upload.csv
+	Rscript ./WASI.R
