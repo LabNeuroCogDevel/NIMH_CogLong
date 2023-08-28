@@ -14,6 +14,7 @@ see [`Makefile`](./Makefile)
 
  * MGS Encode ([mri](https://ndar.nih.gov/experiment.html?id=832&collectionId=2831), [eyetracking](https://ndar.nih.gov/experiment.html?id=887&collectionId=2831))
  * AntiState ([mri](https://ndar.nih.gov/experiment.html?id=831&collectionId=2831), [eyetracking](https://ndar.nih.gov/experiment.html?id=876&collectionId=2831))
+ * Cantab ([dictionary](https://nda.nih.gov/data_structure.html?short_name=cantab01))
 
 ## Local
 

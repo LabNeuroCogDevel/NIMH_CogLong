@@ -21,3 +21,6 @@ txt/upload_no-src-date_visit2+/AS_eye_upload.csv txt/upload_no-src-date_visit2+/
 
 txt/share/wasi_coglong.csv: txt/upload/T1_fmri_upload.csv
 	Rscript ./WASI.R
+
+txt/upload/cantab01.csv:
+	Rscript CANTAB.R
